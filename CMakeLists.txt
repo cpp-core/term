@@ -1,0 +1,104 @@
+cmake_minimum_required (VERSION 3.24 FATAL_ERROR)
+project (term VERSION 0.1 LANGUAGES C CXX)
+
+# Make including this file idempotent
+#
+if(TARGET term OR TARGET term::term)
+  return()
+endif()
+
+# If this is the current project.
+#
+if(PROJECT_NAME STREQUAL CMAKE_PROJECT_NAME)
+  # Laod the cmake recipes and utilities.
+  #
+  include(${CMAKE_CURRENT_LIST_DIR}/cmake/load_cmake_helpers.cmake)
+  
+  # Options for generating tests and documentation.
+  #
+  option(TERM_TEST "Generate the tests." ON)
+  option(TERM_DOCS "Generate the docs." OFF)
+
+  # compile_commands.json
+  #
+  symlink_compile_commands()
+
+  # Convenience targets for git operations
+  #
+  make_submodule_pull_target()
+  
+else()
+  option(TERM_TEST "Generate the tests." OFF)
+  option(TERM_DOCS "Generate the docs." OFF)
+endif()
+
+# Put executables in the top-level binary directory
+#
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+# Output configuration
+#
+message("-- term: Configuration: ${CMAKE_CURRENT_SOURCE_DIR}")
+message("-- term: Included from: ${CMAKE_SOURCE_DIR}")
+message("-- term: Install prefix ${CMAKE_INSTALL_PREFIX}")
+message("-- term: test ${TERM_TEST}")
+message("-- term: docs ${TERM_DOCS}")
+
+# Setup compilation
+#
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+add_compile_options(-Wall)
+add_compile_options(-stdlib=libc++)
+add_compile_options(-O)
+add_link_options(-stdlib=libc++)
+
+# Add our dependencies
+#
+add_fmt()
+add_stream()
+
+# Build the library
+#
+set(SOURCES
+  term/ansi
+  term/unicode/block_elements
+  term/unicode/box_drawing
+  term/unicode/braille
+  term/unicode/unicode
+  )
+
+set(FILES)
+foreach(SOURCE ${SOURCES})
+  list(APPEND FILES "src/core/${SOURCE}.cpp")
+endforeach()
+
+add_library(term ${FILES})
+add_library(term::term ALIAS term) # Allow interop between FetchContent and FindPackage.
+
+# Define the header files for this library.
+#
+file(GLOB_RECURSE PUBLIC_INCLUDE_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} include/*.h)
+target_sources(term PUBLIC FILE_SET HEADERS BASE_DIRS include FILES ${PUBLIC_INCLUDE_FILES})
+
+target_include_directories(term PUBLIC)
+target_link_libraries(term PUBLIC fmt::fmt)
+
+# Optionally configure the tests
+#
+if(TERM_TEST)
+  add_gtest()
+  add_subdirectory(test)
+endif()
+
+# Optionally configure the documentation
+#
+#if(TERM_DOCS)
+#  add_subdirectory(docs)
+#endif()
+
+# Install config
+#
+install_config(term)
